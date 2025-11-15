@@ -25,6 +25,7 @@ export function Page() {
   const [stats, setStats] = useState(null);
   const [summary, setSummary] = useState(null);
   const [detections, setDetections] = useState([]);
+  const [teethFdi, setTeethFdi] = useState(null); // ⭐ NUEVO
 
   const [canSave, setCanSave] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState(0);
@@ -51,6 +52,7 @@ export function Page() {
     setStats(null);
     setSummary(null);
     setDetections([]);
+    setTeethFdi(null); // ⭐ NUEVO
     setErr(null);
     setCanSave(false);
   };
@@ -71,6 +73,7 @@ export function Page() {
     setStats(null);
     setSummary(null);
     setDetections([]);
+    setTeethFdi(null); // ⭐ NUEVO
     setErr(null);
     setCanSave(false);
   };
@@ -124,6 +127,7 @@ export function Page() {
       setStats(data.stats || null);
       setSummary(data.summary || null);
       setDetections(Array.isArray(data.detections) ? data.detections : []);
+      setTeethFdi(data.teeth_fdi || null); // ⭐ NUEVO
       setImageSrc(
         data.image_base64 ? `data:image/png;base64,${data.image_base64}` : null
       );
@@ -151,6 +155,7 @@ export function Page() {
       setStats(data.stats || null);
       setSummary(data.summary || null);
       setDetections(Array.isArray(data.detections) ? data.detections : []);
+      setTeethFdi(data.teeth_fdi || null); // ⭐ NUEVO
       setImageSrc(
         data.image_base64 ? `data:image/png;base64,${data.image_base64}` : null
       );
@@ -257,6 +262,7 @@ export function Page() {
         stats={stats}
         summary={summary}
         detections={detections}
+        teethFdi={teethFdi} // ⭐ NUEVO
         filename={file?.name}
       />
 

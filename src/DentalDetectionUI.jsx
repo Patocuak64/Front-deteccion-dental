@@ -16,6 +16,7 @@ export function DentalDetectionUI({
   summary = null,
   detections = [],
   filename = "",
+  teethFdi = null, // ⭐ NUEVO: { Caries: [36, 11], Diente_Retenido: [], Perdida_Osea: [46] }
 }) {
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
   const [previewSrc, setPreviewSrc] = useState(null);
@@ -60,6 +61,11 @@ export function DentalDetectionUI({
   const cariesCount = perClass["Caries"] || 0;
   const retenidosCount = perClass["Diente_Retenido"] || 0;
   const oseaCount = perClass["Perdida_Osea"] || 0;
+
+  // ⭐ NUEVO: Extraer dientes FDI
+  const cariesFdi = teethFdi?.Caries || [];
+  const retenidosFdi = teethFdi?.Diente_Retenido || [];
+  const oseaFdi = teethFdi?.Perdida_Osea || [];
 
   return (
     <div className="dental-ui-root">
@@ -175,6 +181,39 @@ export function DentalDetectionUI({
         }
         .img-wrap img { width: 100%; height: auto; display: block; }
         .meta { font-size: 14px; color: #222; display: grid; gap: 4px; }
+        
+        /* ⭐ NUEVO: Estilos para números FDI */
+        .fdi-numbers {
+          font-size: 13px;
+          color: #0066cc;
+          padding-left: 16px;
+          margin-top: 2px;
+          font-family: 'Courier New', monospace;
+        }
+        .fdi-badge {
+          display: inline-block;
+          background: #e3f2fd;
+          border: 1px solid #90caf9;
+          border-radius: 4px;
+          padding: 2px 6px;
+          margin: 2px;
+          font-size: 12px;
+          font-weight: 600;
+          color: #1565c0;
+        }
+        .fdi-section {
+          margin-top: 8px;
+          padding: 8px;
+          background: #f9f9f9;
+          border-left: 3px solid #0066cc;
+          border-radius: 4px;
+        }
+        .fdi-title {
+          font-weight: 600;
+          color: #333;
+          margin-bottom: 4px;
+        }
+        
         .report {
           white-space: pre-wrap;
           font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
@@ -334,7 +373,7 @@ export function DentalDetectionUI({
                 )}
               </div>
 
-              {/* Resumen numérico por clase */}
+              {/* ⭐ MODIFICADO: Resumen numérico con FDI */}
               <div className="meta">
                 <div>
                   <b>Total detecciones:</b> {totalDetections}
@@ -344,6 +383,47 @@ export function DentalDetectionUI({
                   <b>Dientes retenidos:</b> {retenidosCount} ·{" "}
                   <b>Pérdida ósea:</b> {oseaCount}
                 </div>
+
+                {/* ⭐ NUEVO: Sección de dientes FDI */}
+                {teethFdi && (cariesFdi.length > 0 || retenidosFdi.length > 0 || oseaFdi.length > 0) && (
+                  <div className="fdi-section">
+                    <div className="fdi-title">🦷 Dientes afectados (Sistema FDI):</div>
+                    
+                    {cariesFdi.length > 0 && (
+                      <div className="fdi-numbers">
+                        <span style={{ color: '#d32f2f', fontWeight: 600 }}>• Caries:</span>{' '}
+                        {cariesFdi.sort((a, b) => a - b).map(fdi => (
+                          <span key={fdi} className="fdi-badge" style={{ borderColor: '#ef5350' }}>
+                            {fdi}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {retenidosFdi.length > 0 && (
+                      <div className="fdi-numbers">
+                        <span style={{ color: '#388e3c', fontWeight: 600 }}>• Dientes retenidos:</span>{' '}
+                        {retenidosFdi.sort((a, b) => a - b).map(fdi => (
+                          <span key={fdi} className="fdi-badge" style={{ borderColor: '#66bb6a' }}>
+                            {fdi}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {oseaFdi.length > 0 && (
+                      <div className="fdi-numbers">
+                        <span style={{ color: '#0288d1', fontWeight: 600 }}>• Pérdida ósea:</span>{' '}
+                        {oseaFdi.sort((a, b) => a - b).map(fdi => (
+                          <span key={fdi} className="fdi-badge" style={{ borderColor: '#4fc3f7' }}>
+                            {fdi}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {summary?.per_class && (
                   <div style={{ fontSize: 12 }}>
                     <b>Por clase (raw):</b>{" "}

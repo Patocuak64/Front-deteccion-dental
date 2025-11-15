@@ -38,6 +38,33 @@ export function HistoryPanel({ token, lastSavedAt }) {
     loadHistory();
   }, [token, lastSavedAt]);
 
+  // ─────────────────────────────────────
+  // Formatear dientes FDI por tipo
+  // ─────────────────────────────────────
+  const formatFdiList = (teethFdi) => {
+    if (!teethFdi) return "";
+
+    const parts = [];
+
+    if (teethFdi.Caries && teethFdi.Caries.length > 0) {
+      parts.push("C: " + [...teethFdi.Caries].sort((a, b) => a - b).join(", "));
+    }
+
+    if (teethFdi.Diente_Retenido && teethFdi.Diente_Retenido.length > 0) {
+      parts.push(
+        "R: " + [...teethFdi.Diente_Retenido].sort((a, b) => a - b).join(", ")
+      );
+    }
+
+    if (teethFdi.Perdida_Osea && teethFdi.Perdida_Osea.length > 0) {
+      parts.push(
+        "P: " + [...teethFdi.Perdida_Osea].sort((a, b) => a - b).join(", ")
+      );
+    }
+
+    return parts.length > 0 ? parts.join(" | ") : "";
+  };
+
   return (
     <div
       style={{
@@ -66,6 +93,7 @@ export function HistoryPanel({ token, lastSavedAt }) {
               <th>Caries</th>
               <th>Retenido</th>
               <th>Ósea</th>
+              <th>Dientes FDI</th>
               <th>Ver imagen</th>
             </tr>
           </thead>
@@ -91,13 +119,14 @@ export function HistoryPanel({ token, lastSavedAt }) {
                   <td>{a.caries}</td>
                   <td>{a.retenido}</td>
                   <td>{a.osea ?? a.perdida}</td>
+                  <td>{formatFdiList(a.teeth_fdi)}</td>
                   <td>
                     {img ? (
                       <button onClick={() => setModalImage(img)}>
                         Ver imagen
                       </button>
                     ) : (
-                      "—"
+                      <span>-</span>
                     )}
                   </td>
                 </tr>
