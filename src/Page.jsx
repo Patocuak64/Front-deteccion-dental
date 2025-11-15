@@ -1,3 +1,4 @@
+// src/Page.jsx
 import React, { useState } from "react";
 import { DentalDetectionUI } from "./DentalDetectionUI.jsx";
 import { AuthPanel } from "./AuthPanel.jsx";
@@ -25,11 +26,11 @@ export function Page() {
   const [summary, setSummary] = useState(null);
   const [detections, setDetections] = useState([]);
 
-  const [canSave, setCanSave] = useState(false); // hay resultado listo para guardar
-  const [lastSavedAt, setLastSavedAt] = useState(0); // 👈 para refrescar historial
+  const [canSave, setCanSave] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState(0);
 
   // ──────────────────────────────────
-  // Callbacks de autenticación
+  // Auth callbacks
   // ──────────────────────────────────
   const handleLogin = (newToken, userEmail) => {
     setToken(newToken);
@@ -43,6 +44,15 @@ export function Page() {
     setEmail("");
     localStorage.removeItem("token");
     localStorage.removeItem("user_email");
+    // limpiamos estado de análisis por si acaso
+    setFile(null);
+    setImageSrc(null);
+    setReportText("");
+    setStats(null);
+    setSummary(null);
+    setDetections([]);
+    setErr(null);
+    setCanSave(false);
   };
 
   // ──────────────────────────────────
@@ -72,7 +82,6 @@ export function Page() {
     if (!file) {
       throw new Error("Primero sube una imagen.");
     }
-
     if (save && !token) {
       throw new Error("Debes iniciar sesión para guardar en tu historial.");
     }
@@ -87,22 +96,16 @@ export function Page() {
     const headers = {};
 
     if (token) {
-      // Si hay token usamos el endpoint protegido
       url = `${API_BASE}/analyze`;
       headers["Authorization"] = `Bearer ${token}`;
     }
 
-    const resp = await fetch(url, {
-      method: "POST",
-      headers,
-      body: fd,
-    });
+    const resp = await fetch(url, { method: "POST", headers, body: fd });
 
     if (!resp.ok) {
       const text = await resp.text().catch(() => "");
       throw new Error(text || `Error HTTP ${resp.status}`);
     }
-
     return resp.json();
   };
 
@@ -125,7 +128,7 @@ export function Page() {
         data.image_base64 ? `data:image/png;base64,${data.image_base64}` : null
       );
 
-      setCanSave(true); // ahora sí se puede guardar en historial
+      setCanSave(true);
     } catch (e) {
       console.error(e);
       setErr(e.message || "Error procesando la imagen");
@@ -135,7 +138,7 @@ export function Page() {
   };
 
   // ──────────────────────────────────
-  // Guardar en historial (botón aparte)
+  // Guardar en historial
   // ──────────────────────────────────
   const onSaveToHistory = async () => {
     try {
@@ -144,7 +147,6 @@ export function Page() {
 
       const data = await callAnalyzeEndpoint({ save: true });
 
-      //  refrescar vista con los datos devueltos
       setReportText(data.report_text || "");
       setStats(data.stats || null);
       setSummary(data.summary || null);
@@ -153,8 +155,7 @@ export function Page() {
         data.image_base64 ? `data:image/png;base64,${data.image_base64}` : null
       );
 
-      //  Disparamos un "evento" de que hubo un guardado nuevo
-      setLastSavedAt(Date.now());
+      setLastSavedAt(Date.now()); // refresca <HistoryPanel/>
     } catch (e) {
       console.error(e);
       setErr(e.message || "No se pudo guardar en tu historial");
@@ -163,19 +164,85 @@ export function Page() {
     }
   };
 
-  return (
-    <div>
-      {/* Panel de autenticación arriba */}
-      <div style={{ padding: 12 }}>
-        <AuthPanel
-          token={token}
-          email={email}
-          onLogin={handleLogin}
-          onLogout={handleLogout}
-        />
+  // ──────────────────────────────────
+  // Vista LOGIN
+  // ──────────────────────────────────
+  if (!token) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "#0f172a",
+          color: "#fff",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 20,
+          boxSizing: "border-box",
+        }}
+      >
+        <div
+          style={{
+            maxWidth: 1000,
+            width: "100%",
+            display: "grid",
+            gridTemplateColumns: "minmax(0,1.5fr) minmax(0,1fr)",
+            gap: 32,
+            alignItems: "center",
+          }}
+        >
+          <div>
+            <h1 style={{ fontSize: 32, marginBottom: 16 }}>
+              DentalSmart · detección de problemas dentales
+            </h1>
+            <p style={{ fontSize: 16, opacity: 0.9 }}>
+              Crea una cuenta para guardar el historial de radiografías
+              analizadas y comparar la evolución de tus pacientes.
+            </p>
+          </div>
+          <AuthPanel onLogin={handleLogin} />
+        </div>
       </div>
+    );
+  }
 
-      {/* UI principal del análisis */}
+  // ──────────────────────────────────
+  // Vista PRINCIPAL (logueado)
+  // ──────────────────────────────────
+  return (
+    <div style={{ minHeight: "100vh", background: "#003366", color: "#fff" }}>
+      {/* barra superior */}
+      <header
+        style={{
+          background: "#0b213f",
+          padding: "10px 20px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          color: "#fff",
+        }}
+      >
+        <div style={{ fontWeight: "bold" }}>DentalSmart</div>
+        <div style={{ fontSize: 14 }}>
+          Sesión iniciada como <b>{email}</b>
+          <button
+            type="button"
+            onClick={handleLogout}
+            style={{
+              marginLeft: 12,
+              padding: "4px 10px",
+              fontSize: 13,
+              borderRadius: 4,
+              border: "none",
+              cursor: "pointer",
+            }}
+          >
+            Cerrar sesión
+          </button>
+        </div>
+      </header>
+
+      {/* contenido principal */}
       <DentalDetectionUI
         onAnalyze={onAnalyze}
         onClear={onClear}
@@ -193,12 +260,10 @@ export function Page() {
         filename={file?.name}
       />
 
-      {/* Historial solo visible si hay usuario logueado */}
-      {token && (
-        <div style={{ padding: 20 }}>
-          <HistoryPanel token={token} lastSavedAt={lastSavedAt} />
-        </div>
-      )}
+      {/* historial */}
+      <div style={{ padding: 20 }}>
+        <HistoryPanel token={token} lastSavedAt={lastSavedAt} />
+      </div>
     </div>
   );
 }

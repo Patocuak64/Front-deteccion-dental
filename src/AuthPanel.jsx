@@ -5,28 +5,23 @@ const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 function extractErrorMessage(data, fallback = "Error") {
   if (!data) return fallback;
-
-  // FastAPI típico: {"detail": "..."} o {"detail":[{"msg": "..."}]}
   if (typeof data.detail === "string") return data.detail;
 
   if (Array.isArray(data.detail)) {
-    const msgs = data.detail
-      .map((d) => d?.msg)
-      .filter(Boolean);
+    const msgs = data.detail.map((d) => d?.msg).filter(Boolean);
     if (msgs.length) return msgs.join(" | ");
   }
-
   return fallback;
 }
 
-export function AuthPanel({ token, email, onLogin, onLogout }) {
+export function AuthPanel({ onLogin }) {
   const [mode, setMode] = useState("login"); // "login" | "register"
-  const [formEmail, setFormEmail] = useState(email || "");
+  const [formEmail, setFormEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // 🔐 LOGIN → usa form-urlencoded (username + password)
+  // LOGIN (OAuth2 password, form-urlencoded)
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -44,19 +39,14 @@ export function AuthPanel({ token, email, onLogin, onLogout }) {
       });
 
       const data = await res.json().catch(() => null);
-
       if (!res.ok) {
-        const msg = extractErrorMessage(
-          data,
-          "Error al iniciar sesión"
-        );
+        const msg = extractErrorMessage(data, "Error al iniciar sesión");
         throw new Error(msg);
       }
 
       const token = data.access_token;
       if (!token) throw new Error("Respuesta sin token");
 
-      // Guardar estado y localStorage
       onLogin?.(token, formEmail);
       localStorage.setItem("token", token);
       localStorage.setItem("user_email", formEmail);
@@ -68,33 +58,25 @@ export function AuthPanel({ token, email, onLogin, onLogout }) {
     }
   };
 
-  // 🧾 REGISTRO → sigue siendo JSON
+  // REGISTRO (JSON + login automático)
   const handleRegister = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError("");
 
     try {
-      // 1) registrar usuario
       const resReg = await fetch(`${API_URL}/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: formEmail,
-          password,
-        }),
+        body: JSON.stringify({ email: formEmail, password }),
       });
 
       const dataReg = await resReg.json().catch(() => null);
       if (!resReg.ok) {
-        const msg = extractErrorMessage(
-          dataReg,
-          "Error al registrar"
-        );
+        const msg = extractErrorMessage(dataReg, "Error al registrar");
         throw new Error(msg);
       }
 
-      // 2) loguear automáticamente tras registrar
       const body = new URLSearchParams();
       body.append("username", formEmail);
       body.append("password", password);
@@ -128,51 +110,28 @@ export function AuthPanel({ token, email, onLogin, onLogout }) {
     }
   };
 
-  const handleLogoutClick = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user_email");
-    onLogout?.();
-  };
-
-  // ✅ Si ya está logueado, solo mostramos info + botón "Cerrar sesión"
-  if (token) {
-    return (
-      <div style={{ marginBottom: 20 }}>
-        <p style={{ margin: 0, fontSize: 14 }}>
-          Sesión iniciada como <b>{email}</b>
-        </p>
-        <button
-          type="button"
-          style={{ marginTop: 8, padding: "6px 12px", fontSize: 14 }}
-          onClick={handleLogoutClick}
-        >
-          Cerrar sesión
-        </button>
-      </div>
-    );
-  }
-
-  // 🧾 Formulario login / registro
   return (
     <div
       style={{
-        marginBottom: 20,
-        background: "#f0f0f0",
-        padding: 12,
-        borderRadius: 6,
-        color: "#000",
+        background: "#ffffff",
+        padding: 24,
+        borderRadius: 10,
+        boxShadow: "0 10px 30px rgba(0,0,0,0.18)",
+        width: "100%",
+        maxWidth: 420,
       }}
     >
-      <div style={{ marginBottom: 8, display: "flex", gap: 8 }}>
+      <div style={{ marginBottom: 16, display: "flex", gap: 8 }}>
         <button
           type="button"
           onClick={() => setMode("login")}
           style={{
-            padding: "4px 8px",
+            flex: 1,
+            padding: "8px 0",
             fontSize: 14,
-            background: mode === "login" ? "#007bff" : "#ffffff",
+            background: mode === "login" ? "#0d6efd" : "#f1f1f1",
             color: mode === "login" ? "#fff" : "#000",
-            borderRadius: 4,
+            borderRadius: 6,
             border: "1px solid #ccc",
             cursor: "pointer",
           }}
@@ -183,11 +142,12 @@ export function AuthPanel({ token, email, onLogin, onLogout }) {
           type="button"
           onClick={() => setMode("register")}
           style={{
-            padding: "4px 8px",
+            flex: 1,
+            padding: "8px 0",
             fontSize: 14,
-            background: mode === "register" ? "#007bff" : "#ffffff",
+            background: mode === "register" ? "#0d6efd" : "#f1f1f1",
             color: mode === "register" ? "#fff" : "#000",
-            borderRadius: 4,
+            borderRadius: 6,
             border: "1px solid #ccc",
             cursor: "pointer",
           }}
@@ -197,33 +157,56 @@ export function AuthPanel({ token, email, onLogin, onLogout }) {
       </div>
 
       <form onSubmit={mode === "login" ? handleLogin : handleRegister}>
-        <div style={{ marginBottom: 8 }}>
-          <label style={{ fontSize: 13 }}>
-            Correo (puede ser Gmail)
-            <input
-              type="email"
-              required
-              value={formEmail}
-              onChange={(e) => setFormEmail(e.target.value)}
-              style={{ width: "100%", padding: 6, marginTop: 4, fontSize: 14 }}
-            />
+        <div style={{ marginBottom: 10 }}>
+          <label style={{ fontSize: 13, display: "block", marginBottom: 4 }}>
+            Correo electrónico
           </label>
+          <input
+            type="email"
+            required
+            value={formEmail}
+            onChange={(e) => setFormEmail(e.target.value)}
+            placeholder="ejemplo@correo.com"
+            style={{
+              width: "100%",
+              padding: 8,
+              fontSize: 14,
+              boxSizing: "border-box",
+              borderRadius: 6,
+              border: "1px solid #d4d4d4",
+            }}
+          />
+          <div style={{ fontSize: 11, color: "#555", marginTop: 2 }}>
+            Aquí va tu correo (por ejemplo, tu Gmail).
+          </div>
         </div>
-        <div style={{ marginBottom: 8 }}>
-          <label style={{ fontSize: 13 }}>
+
+        <div style={{ marginBottom: 10 }}>
+          <label style={{ fontSize: 13, display: "block", marginBottom: 4 }}>
             Contraseña
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              style={{ width: "100%", padding: 6, marginTop: 4, fontSize: 14 }}
-            />
           </label>
+          <input
+            type="password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Mínimo 6 caracteres"
+            style={{
+              width: "100%",
+              padding: 8,
+              fontSize: 14,
+              boxSizing: "border-box",
+              borderRadius: 6,
+              border: "1px solid #d4d4d4",
+            }}
+          />
+          <div style={{ fontSize: 11, color: "#555", marginTop: 2 }}>
+            Aquí va la contraseña que usarás para iniciar sesión.
+          </div>
         </div>
 
         {error && (
-          <div style={{ color: "#b00020", fontSize: 13, marginBottom: 4 }}>
+          <div style={{ color: "#b00020", fontSize: 13, marginBottom: 8 }}>
             {error}
           </div>
         )}
@@ -231,7 +214,16 @@ export function AuthPanel({ token, email, onLogin, onLogout }) {
         <button
           type="submit"
           disabled={loading}
-          style={{ padding: "6px 12px", fontSize: 14 }}
+          style={{
+            width: "100%",
+            padding: "8px 0",
+            fontSize: 15,
+            borderRadius: 6,
+            border: "none",
+            background: "#0d6efd",
+            color: "#fff",
+            cursor: "pointer",
+          }}
         >
           {loading
             ? "Procesando..."

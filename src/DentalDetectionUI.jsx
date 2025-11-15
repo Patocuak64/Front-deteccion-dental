@@ -1,12 +1,13 @@
+// src/DentalDetectionUI.jsx
 import React, { useRef, useState } from "react";
 
 export function DentalDetectionUI({
   onAnalyze,
   onClear,
   onUpload,
-  onSaveToHistory,     //  nuevo callback
-  canSave = false,     //  hay resultado listo para guardar
-  saving = false,      //  se está guardando en historial
+  onSaveToHistory,
+  canSave = false,
+  saving = false,
   loading = false,
   error = null,
   annotatedImageSrc = null,
@@ -26,12 +27,9 @@ export function DentalDetectionUI({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Notificamos al padre
-    if (typeof onUpload === "function") onUpload(file);
+    onUpload?.(file);
 
-    // limpiamos vista local
     setPreviewSrc(null);
-
     const reader = new FileReader();
     reader.onload = (ev) => setPreviewSrc(ev.target.result);
     reader.readAsDataURL(file);
@@ -41,32 +39,36 @@ export function DentalDetectionUI({
     if (!onAnalyze) return;
     setLoadingAnalysis(true);
     try {
-      await onAnalyze(); // el padre se encarga de llamar al backend
+      await onAnalyze();
     } finally {
       setLoadingAnalysis(false);
     }
   };
 
   const handleClearClick = () => {
-    if (typeof onClear === "function") onClear();
+    onClear?.();
     setPreviewSrc(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const isLoading = loading || loadingAnalysis;
   const canShowSaveButton = canSave && !isLoading;
 
+  // Resumen por clase (para mostrar claramente caries / retenidos / ósea)
+  const perClass = summary?.per_class || {};
+  const totalDetections = summary?.total ?? 0;
+  const cariesCount = perClass["Caries"] || 0;
+  const retenidosCount = perClass["Diente_Retenido"] || 0;
+  const oseaCount = perClass["Perdida_Osea"] || 0;
+
   return (
     <div className="dental-ui-root">
       <style>{`
         .dental-ui-root {
-          margin: 0;
           font-family: Arial, sans-serif;
           background-color: #003366;
           color: white;
-          min-height: 100vh;
+          padding: 0 0 30px 0;
         }
         .header {
           background-color: #556677;
@@ -75,19 +77,21 @@ export function DentalDetectionUI({
           font-size: 1.5em;
         }
         .container {
+          max-width: 1200px;
+          margin: 0 auto;
           display: flex;
           flex-wrap: wrap;
           padding: 20px;
           gap: 20px;
         }
-        .sidebar { flex: 1 1 300px; margin-right: 0; }
+        .sidebar { flex: 0 0 260px; }
         .legend { margin-bottom: 20px; }
-        .legend-item { display: flex; align-items: center; margin-bottom: 10px; font-size: 1.2em; }
+        .legend-item { display: flex; align-items: center; margin-bottom: 10px; font-size: 1.1em; text-transform: capitalize; }
         .circle { width: 20px; height: 20px; border-radius: 50%; margin-right: 10px; border: 2px solid rgba(255,255,255,0.35); }
         .red { background-color: #ff0000; }
         .green { background-color: #00ff00; }
         .cyan { background-color: #00ffff; }
-        .buttons { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+        .buttons { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
         .btn {
           padding: 10px 20px;
           font-size: 1em;
@@ -106,11 +110,15 @@ export function DentalDetectionUI({
           background-color: #28a745;
           color: #ffffff;
         }
-        .save-btn[disabled] {
-          opacity: 0.6;
-          cursor: default;
+        .save-btn[disabled] { opacity: 0.6; cursor: default; }
+
+        .main {
+          flex: 1 1 0;
+          display: flex;
+          gap: 20px;
+          min-width: 300px;
+          align-items: stretch;
         }
-        .main { flex: 3 1 600px; display: flex; gap: 20px; min-width: 300px; }
         .upload-section, .results-section {
           flex: 1;
           background-color: #f0f0f0;
@@ -120,6 +128,7 @@ export function DentalDetectionUI({
           display: flex;
           flex-direction: column;
           gap: 12px;
+          min-height: 420px;
         }
         .upload-box {
           flex: 1;
@@ -153,7 +162,7 @@ export function DentalDetectionUI({
           border: 1px solid #d7d7d7;
           padding: 12px;
           display: grid;
-          grid-template-rows: auto auto 1fr;
+          grid-template-rows: auto auto auto 1fr;
           gap: 10px;
           overflow: hidden;
         }
@@ -165,12 +174,7 @@ export function DentalDetectionUI({
           border-radius: 6px;
         }
         .img-wrap img { width: 100%; height: auto; display: block; }
-        .meta {
-          font-size: 14px;
-          color: #222;
-          display: grid;
-          gap: 4px;
-        }
+        .meta { font-size: 14px; color: #222; display: grid; gap: 4px; }
         .report {
           white-space: pre-wrap;
           font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
@@ -189,8 +193,8 @@ export function DentalDetectionUI({
           border: 1px solid #f5c2c7;
           padding: 8px;
           border-radius: 6px;
+          margin-top: 8px;
         }
-        .loading { color: #0b5ed7; }
         .preview-wrap {
           margin-top: 10px;
           width: 100%;
@@ -201,19 +205,8 @@ export function DentalDetectionUI({
           background: #ffffff;
           padding: 8px;
         }
-        .preview-wrap img {
-          display: block;
-          width: 100%;
-          height: auto;
-        }
-        .progress {
-          margin-top: 10px;
-          width: 100%;
-          height: 6px;
-          background: #e0e0e0;
-          border-radius: 3px;
-          overflow: hidden;
-        }
+        .preview-wrap img { display: block; width: 100%; height: auto; }
+        .progress { margin-top: 10px; width: 100%; height: 6px; background: #e0e0e0; border-radius: 3px; overflow: hidden; }
         .progress-inner {
           width: 40%;
           height: 100%;
@@ -225,7 +218,11 @@ export function DentalDetectionUI({
           100% { transform: translateX(250%); }
         }
         h2 { margin: 0; color: #000000; }
-        @media (max-width: 1024px) { .main { flex-direction: column; } }
+        @media (max-width: 1024px) {
+          .container { flex-direction: column; }
+          .main { flex-direction: column; }
+          .sidebar { flex-basis: auto; }
+        }
       `}</style>
 
       <div className="header">Sistema de detección de problemas dentales</div>
@@ -233,9 +230,15 @@ export function DentalDetectionUI({
       <div className="container">
         <aside className="sidebar">
           <section className="legend" aria-label="Leyenda de clases de detección">
-            <div className="legend-item"><span className="circle red" />caries</div>
-            <div className="legend-item"><span className="circle green" />diente retenido</div>
-            <div className="legend-item"><span className="circle cyan" />perdida osea</div>
+            <div className="legend-item">
+              <span className="circle red" />caries
+            </div>
+            <div className="legend-item">
+              <span className="circle green" />diente retenido
+            </div>
+            <div className="legend-item">
+              <span className="circle cyan" />pérdida ósea
+            </div>
           </section>
 
           <div className="buttons">
@@ -323,7 +326,7 @@ export function DentalDetectionUI({
                 ) : (
                   <div style={{ color: "#777", padding: 12 }}>
                     {isLoading ? (
-                      <span className="loading">Analizando imagen...</span>
+                      <span>Analizando imagen...</span>
                     ) : (
                       "Aquí verás la imagen anotada"
                     )}
@@ -331,30 +334,48 @@ export function DentalDetectionUI({
                 )}
               </div>
 
+              {/* Resumen numérico por clase */}
               <div className="meta">
-                {summary && (
-                  <>
-                    <div><b>Total detecciones:</b> {summary.total ?? 0}</div>
-                    {summary.per_class && (
-                      <div>
-                        <b>Por clase:</b>{" "}
-                        {Object
-                          .entries(summary.per_class)
-                          .map(([k, v]) => `${k}=${v}`)
-                          .join(" · ")}
-                      </div>
-                    )}
-                  </>
+                <div>
+                  <b>Total detecciones:</b> {totalDetections}
+                </div>
+                <div>
+                  <b>Caries:</b> {cariesCount} ·{" "}
+                  <b>Dientes retenidos:</b> {retenidosCount} ·{" "}
+                  <b>Pérdida ósea:</b> {oseaCount}
+                </div>
+                {summary?.per_class && (
+                  <div style={{ fontSize: 12 }}>
+                    <b>Por clase (raw):</b>{" "}
+                    {Object.entries(summary.per_class)
+                      .map(([k, v]) => `${k}=${v}`)
+                      .join(" · ")}
+                  </div>
                 )}
                 {!!detections?.length && (
                   <div style={{ fontSize: 12, color: "#333" }}>
-                    <b>Detecciones:</b> {detections.length} &nbsp;|&nbsp;{" "}
+                    <b>Detecciones (top):</b>{" "}
                     {detections
                       .slice(0, 3)
-                      .map(d => `${d.class_name} (${(d.confidence * 100).toFixed(0)}%)`)
+                      .map(
+                        (d) =>
+                          `${d.class_name} (${(d.confidence * 100).toFixed(0)}%)`
+                      )
                       .join(" · ")}
                     {detections.length > 3 ? "…" : ""}
                   </div>
+                )}
+              </div>
+
+              <div className="report">
+                {reportText ? (
+                  <pre style={{ whiteSpace: "pre-wrap", margin: 0 }}>
+                    {reportText}
+                  </pre>
+                ) : (
+                  <span style={{ color: "#666" }}>
+                    Aquí aparecerá el reporte textual del análisis.
+                  </span>
                 )}
               </div>
 

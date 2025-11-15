@@ -10,160 +10,151 @@ export function HistoryPanel({ token, lastSavedAt }) {
   const [analyses, setAnalyses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
+  const [modalImage, setModalImage] = useState(null);
 
   const loadHistory = async () => {
-    if (!token) return;
+    if (!token) {
+      setAnalyses([]);
+      return;
+    }
     setLoading(true);
     setErr("");
     try {
       const res = await fetch(`${API_BASE}/analyses`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(text || `Error HTTP ${res.status}`);
-      }
+      if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
-      // asumimos que data es un array
-      setAnalyses(Array.isArray(data) ? data : []);
+      setAnalyses(data || []);
     } catch (e) {
-      console.error("Error cargando historial:", e);
-      setErr(e.message || "No se pudo cargar el historial.");
+      console.error(e);
+      setErr(e.message || "Error al cargar historial");
     } finally {
       setLoading(false);
     }
   };
 
-  // Cargar al montar y cada vez que haya un nuevo guardado
   useEffect(() => {
     loadHistory();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, lastSavedAt]);
 
-  if (!token) {
-    return (
-      <div>
-        <h3>Historial de radiografías</h3>
-        <p>Inicia sesión para ver tu historial.</p>
-      </div>
-    );
-  }
-
   return (
-    <div>
+    <div
+      style={{
+        background: "#ffffff",
+        color: "#000",
+        padding: 16,
+        borderRadius: 8,
+      }}
+    >
       <h3>Historial de radiografías</h3>
 
-      <button
-        type="button"
-        onClick={loadHistory}
-        disabled={loading}
-        style={{ marginBottom: 10, padding: "4px 10px", fontSize: 13 }}
-      >
-        {loading ? "Actualizando..." : "Actualizar historial"}
-      </button>
+      {loading && <p>Cargando historial...</p>}
+      {err && <div style={{ color: "red" }}>{err}</div>}
 
-      {err && (
-        <div style={{ color: "#b00020", fontSize: 13, marginBottom: 8 }}>
-          {err}
-        </div>
+      {!loading && !err && analyses.length === 0 && <p>No hay datos aún</p>}
+
+      {!loading && !err && analyses.length > 0 && (
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Fecha</th>
+              <th>Archivo</th>
+              <th>Modelo</th>
+              <th>Total</th>
+              <th>Caries</th>
+              <th>Retenido</th>
+              <th>Ósea</th>
+              <th>Ver imagen</th>
+            </tr>
+          </thead>
+          <tbody>
+            {analyses.map((a) => {
+              const img = a.image_base64
+                ? `data:image/png;base64,${a.image_base64}`
+                : null;
+
+              const fechaStr =
+                a.created_at_display ||
+                (a.created_at
+                  ? new Date(a.created_at).toLocaleString()
+                  : "");
+
+              return (
+                <tr key={a.analysis_id}>
+                  <td>{a.id}</td>
+                  <td>{fechaStr}</td>
+                  <td>{a.image_filename}</td>
+                  <td>{a.model_used}</td>
+                  <td>{a.total ?? a.total_detections}</td>
+                  <td>{a.caries}</td>
+                  <td>{a.retenido}</td>
+                  <td>{a.osea ?? a.perdida}</td>
+                  <td>
+                    {img ? (
+                      <button onClick={() => setModalImage(img)}>
+                        Ver imagen
+                      </button>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       )}
 
-      {!loading && analyses.length === 0 && !err && (
-        <p>No hay análisis guardados todavía.</p>
-      )}
+      {/* MODAL */}
+      {modalImage && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.7)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 9999,
+          }}
+          onClick={() => setModalImage(null)}
+        >
+          <div
+            style={{
+              background: "#fff",
+              padding: 20,
+              borderRadius: 12,
+              maxWidth: "90%",
+              maxHeight: "90%",
+              overflow: "auto",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src={modalImage}
+              style={{ maxWidth: "100%", borderRadius: 6 }}
+              alt="Radiografía analizada"
+            />
 
-      <div style={{ display: "grid", gap: 12 }}>
-        {analyses.map((a) => {
-          const id = a.id ?? a.analysis_id ?? a.uuid ?? a.pk;
-          const createdRaw = a.created_at || a.createdAt || a.timestamp;
-          const createdStr = createdRaw
-            ? new Date(createdRaw).toLocaleString()
-            : "Fecha desconocida";
-
-          const fileName = a.file_name || a.filename || `Análisis ${id ?? "?"}`;
-
-          // Si el backend algún día expone una URL de imagen, la mostramos:
-          const imgUrl =
-            a.image_url ||
-            a.annotated_image_url ||
-            a.image_path?.startsWith("http")
-              ? a.image_path
-              : null;
-
-          return (
-            <div
-              key={id || Math.random()}
+            <a
+              href={modalImage}
+              download="radiografia_analizada.png"
               style={{
-                border: "1px solid #ddd",
+                display: "inline-block",
+                marginTop: 10,
+                padding: "6px 14px",
+                background: "#0066ff",
+                color: "#fff",
                 borderRadius: 6,
-                padding: 8,
-                background: "#fafafa",
               }}
             >
-              <div style={{ fontWeight: "bold", marginBottom: 4 }}>
-                {fileName}
-              </div>
-              <div style={{ fontSize: 12, marginBottom: 4 }}>{createdStr}</div>
-
-              {a.summary && (
-                <div style={{ fontSize: 13, marginBottom: 4 }}>
-                  <b>Resumen:</b> {a.summary}
-                </div>
-              )}
-
-              {a.stats && (
-                <div style={{ fontSize: 12, marginBottom: 4 }}>
-                  <b>Stats:</b>{" "}
-                  {typeof a.stats === "string"
-                    ? a.stats
-                    : JSON.stringify(a.stats)}
-                </div>
-              )}
-
-              {imgUrl && (
-                <div
-                  style={{
-                    marginTop: 6,
-                    maxHeight: 180,
-                    overflow: "auto",
-                    borderRadius: 4,
-                    border: "1px solid #ccc",
-                    background: "#fff",
-                  }}
-                >
-                  <img
-                    src={imgUrl}
-                    alt={fileName}
-                    style={{ width: "100%", display: "block" }}
-                  />
-                </div>
-              )}
-
-              {/* Bloque de depuración: ver TODO lo que manda el backend */}
-              <details style={{ marginTop: 6 }}>
-                <summary style={{ fontSize: 12, cursor: "pointer" }}>
-                  Ver JSON completo
-                </summary>
-                <pre
-                  style={{
-                    fontSize: 11,
-                    whiteSpace: "pre-wrap",
-                    background: "#fff",
-                    borderRadius: 4,
-                    border: "1px solid #eee",
-                    padding: 6,
-                    marginTop: 4,
-                  }}
-                >
-                  {JSON.stringify(a, null, 2)}
-                </pre>
-              </details>
-            </div>
-          );
-        })}
-      </div>
+              Descargar imagen
+            </a>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
