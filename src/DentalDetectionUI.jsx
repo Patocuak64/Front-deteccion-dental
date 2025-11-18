@@ -16,12 +16,12 @@ export function DentalDetectionUI({
   summary = null,
   detections = [],
   filename = "",
-  teethFdi = null, // ⭐ NUEVO: { Caries: [36, 11], Diente_Retenido: [], Perdida_Osea: [46] }
+  teethFdi = null, // { Caries: [36, 11], Diente_Retenido: [], Perdida_Osea: [46] }
 }) {
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
   const [previewSrc, setPreviewSrc] = useState(null);
   const fileInputRef = useRef(null);
-
+  const API_BASE = (import.meta.env.VITE_API_URL || "http://127.0.0.1:8000").replace(/\/+$/, "");
   const handlePickFile = () => fileInputRef.current?.click();
 
   const handleFileChange = (e) => {
@@ -62,7 +62,7 @@ export function DentalDetectionUI({
   const retenidosCount = perClass["Diente_Retenido"] || 0;
   const oseaCount = perClass["Perdida_Osea"] || 0;
 
-  // ⭐ NUEVO: Extraer dientes FDI
+  // Extraer dientes FDI
   const cariesFdi = teethFdi?.Caries || [];
   const retenidosFdi = teethFdi?.Diente_Retenido || [];
   const oseaFdi = teethFdi?.Perdida_Osea || [];
@@ -182,7 +182,7 @@ export function DentalDetectionUI({
         .img-wrap img { width: 100%; height: auto; display: block; }
         .meta { font-size: 14px; color: #222; display: grid; gap: 4px; }
         
-        /* ⭐ NUEVO: Estilos para números FDI */
+        /*  Estilos para números FDI */
         .fdi-numbers {
           font-size: 13px;
           color: #0066cc;
@@ -373,7 +373,7 @@ export function DentalDetectionUI({
                 )}
               </div>
 
-              {/* ⭐ MODIFICADO: Resumen numérico con FDI */}
+              {/* Resumen numérico con FDI */}
               <div className="meta">
                 <div>
                   <b>Total detecciones:</b> {totalDetections}
@@ -384,7 +384,7 @@ export function DentalDetectionUI({
                   <b>Pérdida ósea:</b> {oseaCount}
                 </div>
 
-                {/* ⭐ NUEVO: Sección de dientes FDI */}
+                {/* Sección de dientes FDI */}
                 {teethFdi && (cariesFdi.length > 0 || retenidosFdi.length > 0 || oseaFdi.length > 0) && (
                   <div className="fdi-section">
                     <div className="fdi-title">🦷 Dientes afectados (Sistema FDI):</div>

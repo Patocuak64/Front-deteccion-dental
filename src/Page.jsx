@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { DentalDetectionUI } from "./DentalDetectionUI.jsx";
 import { AuthPanel } from "./AuthPanel.jsx";
 import { HistoryPanel } from "./HistoryPanel.jsx";
+import { ModelsPanel } from "./ModelsPanel.jsx"; 
 
 const API_BASE = (import.meta.env.VITE_API_URL || "http://127.0.0.1:8000").replace(
   /\/+$/,
@@ -13,6 +14,7 @@ export function Page() {
   // Auth
   const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [email, setEmail] = useState(localStorage.getItem("user_email") || "");
+  const [activeTab, setActiveTab] = useState("analyze"); 
 
   // Análisis
   const [file, setFile] = useState(null);
@@ -25,7 +27,7 @@ export function Page() {
   const [stats, setStats] = useState(null);
   const [summary, setSummary] = useState(null);
   const [detections, setDetections] = useState([]);
-  const [teethFdi, setTeethFdi] = useState(null); // ⭐ NUEVO
+  const [teethFdi, setTeethFdi] = useState(null);
 
   const [canSave, setCanSave] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState(0);
@@ -52,7 +54,7 @@ export function Page() {
     setStats(null);
     setSummary(null);
     setDetections([]);
-    setTeethFdi(null); // ⭐ NUEVO
+    setTeethFdi(null);
     setErr(null);
     setCanSave(false);
   };
@@ -73,7 +75,7 @@ export function Page() {
     setStats(null);
     setSummary(null);
     setDetections([]);
-    setTeethFdi(null); // ⭐ NUEVO
+    setTeethFdi(null);
     setErr(null);
     setCanSave(false);
   };
@@ -127,7 +129,7 @@ export function Page() {
       setStats(data.stats || null);
       setSummary(data.summary || null);
       setDetections(Array.isArray(data.detections) ? data.detections : []);
-      setTeethFdi(data.teeth_fdi || null); // ⭐ NUEVO
+      setTeethFdi(data.teeth_fdi || null);
       setImageSrc(
         data.image_base64 ? `data:image/png;base64,${data.image_base64}` : null
       );
@@ -155,7 +157,7 @@ export function Page() {
       setStats(data.stats || null);
       setSummary(data.summary || null);
       setDetections(Array.isArray(data.detections) ? data.detections : []);
-      setTeethFdi(data.teeth_fdi || null); // ⭐ NUEVO
+      setTeethFdi(data.teeth_fdi || null);
       setImageSrc(
         data.image_base64 ? `data:image/png;base64,${data.image_base64}` : null
       );
@@ -247,29 +249,98 @@ export function Page() {
         </div>
       </header>
 
-      {/* contenido principal */}
-      <DentalDetectionUI
-        onAnalyze={onAnalyze}
-        onClear={onClear}
-        onUpload={onUpload}
-        onSaveToHistory={onSaveToHistory}
-        loading={loading}
-        saving={saving}
-        canSave={canSave}
-        error={err}
-        annotatedImageSrc={imageSrc}
-        reportText={reportText}
-        stats={stats}
-        summary={summary}
-        detections={detections}
-        teethFdi={teethFdi} // ⭐ NUEVO
-        filename={file?.name}
-      />
-
-      {/* historial */}
-      <div style={{ padding: 20 }}>
-        <HistoryPanel token={token} lastSavedAt={lastSavedAt} />
+      {/* Pestañas de navegación */}
+      <div
+        style={{
+          background: "#0b213f",
+          borderBottom: "2px solid #1e3a5f",
+          display: "flex",
+          gap: "4px",
+          padding: "0 20px",
+        }}
+      >
+        <button
+          onClick={() => setActiveTab("analyze")}
+          style={{
+            padding: "14px 24px",
+            background: activeTab === "analyze" ? "#003366" : "transparent",
+            color: activeTab === "analyze" ? "#fff" : "#94a3b8",
+            border: "none",
+            borderBottom: activeTab === "analyze" ? "3px solid #3b82f6" : "3px solid transparent",
+            cursor: "pointer",
+            fontSize: "15px",
+            fontWeight: activeTab === "analyze" ? "bold" : "normal",
+            transition: "all 0.2s",
+          }}
+        >
+          Analizar
+        </button>
+        <button
+          onClick={() => setActiveTab("history")}
+          style={{
+            padding: "14px 24px",
+            background: activeTab === "history" ? "#003366" : "transparent",
+            color: activeTab === "history" ? "#fff" : "#94a3b8",
+            border: "none",
+            borderBottom: activeTab === "history" ? "3px solid #3b82f6" : "3px solid transparent",
+            cursor: "pointer",
+            fontSize: "15px",
+            fontWeight: activeTab === "history" ? "bold" : "normal",
+            transition: "all 0.2s",
+          }}
+        >
+           Historial
+        </button>
+        <button
+          onClick={() => setActiveTab("models")}
+          style={{
+            padding: "14px 24px",
+            background: activeTab === "models" ? "#003366" : "transparent",
+            color: activeTab === "models" ? "#fff" : "#94a3b8",
+            border: "none",
+            borderBottom: activeTab === "models" ? "3px solid #3b82f6" : "3px solid transparent",
+            cursor: "pointer",
+            fontSize: "15px",
+            fontWeight: activeTab === "models" ? "bold" : "normal",
+            transition: "all 0.2s",
+          }}
+        >
+           Modelos
+        </button>
       </div>
+
+      {/*  Contenido condicional según pestaña */}
+      {activeTab === "analyze" && (
+        <DentalDetectionUI
+          onAnalyze={onAnalyze}
+          onClear={onClear}
+          onUpload={onUpload}
+          onSaveToHistory={onSaveToHistory}
+          loading={loading}
+          saving={saving}
+          canSave={canSave}
+          error={err}
+          annotatedImageSrc={imageSrc}
+          reportText={reportText}
+          stats={stats}
+          summary={summary}
+          detections={detections}
+          teethFdi={teethFdi}
+          filename={file?.name}
+        />
+      )}
+
+      {activeTab === "history" && (
+        <div style={{ padding: 20 }}>
+          <HistoryPanel token={token} lastSavedAt={lastSavedAt} />
+        </div>
+      )}
+
+      {activeTab === "models" && (
+        <div style={{ padding: 20 }}>
+          <ModelsPanel token={token} />
+        </div>
+      )}
     </div>
   );
 }

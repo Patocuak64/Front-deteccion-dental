@@ -1,7 +1,7 @@
 // src/AuthPanel.jsx
 import { useState } from "react";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_BASE = (import.meta.env.VITE_API_URL || "http://127.0.0.1:8000").replace(/\/+$/, "");
 
 function extractErrorMessage(data, fallback = "Error") {
   if (!data) return fallback;
@@ -32,7 +32,7 @@ export function AuthPanel({ onLogin }) {
       body.append("username", formEmail);
       body.append("password", password);
 
-      const res = await fetch(`${API_URL}/auth/login`, {
+      const res = await fetch(`${API_BASE}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body,
@@ -65,7 +65,7 @@ export function AuthPanel({ onLogin }) {
     setError("");
 
     try {
-      const resReg = await fetch(`${API_URL}/auth/register`, {
+      const resReg = await fetch(`${API_BASE}/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: formEmail, password }),
@@ -81,7 +81,7 @@ export function AuthPanel({ onLogin }) {
       body.append("username", formEmail);
       body.append("password", password);
 
-      const resLogin = await fetch(`${API_URL}/auth/login`, {
+      const resLogin = await fetch(`${API_BASE}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body,
