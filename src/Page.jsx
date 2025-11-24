@@ -1,9 +1,13 @@
 // src/Page.jsx
 import React, { useState } from "react";
-import { DentalDetectionUI } from "./DentalDetectionUI.jsx";
 import { AuthPanel } from "./AuthPanel.jsx";
 import { HistoryPanel } from "./HistoryPanel.jsx";
 import { ModelsPanel } from "./ModelsPanel.jsx"; 
+import { StepIndicator } from "./StepIndicator.jsx";
+import { StepUpload } from "./StepUpload.jsx";
+import { StepResults } from "./StepResults.jsx";
+import { StepActions } from "./StepActions.jsx";
+import { Toast } from "./Toast.jsx";
 
 const API_BASE = (import.meta.env.VITE_API_URL || "http://127.0.0.1:8000").replace(
   /\/+$/,
@@ -15,6 +19,9 @@ export function Page() {
   const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [email, setEmail] = useState(localStorage.getItem("user_email") || "");
   const [activeTab, setActiveTab] = useState("analyze"); 
+
+  // Sistema de pasos
+  const [currentStep, setCurrentStep] = useState(1); // 1: Upload, 2: Results, 3: Actions
 
   // Análisis
   const [file, setFile] = useState(null);
@@ -29,8 +36,25 @@ export function Page() {
   const [detections, setDetections] = useState([]);
   const [teethFdi, setTeethFdi] = useState(null);
 
-  const [canSave, setCanSave] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState(0);
+
+  // Toast notifications
+  const [toast, setToast] = useState(null);
+
+  const showToast = (message, type = "success") => {
+    setToast({ message, type });
+  };
+
+  const closeToast = () => {
+    setToast(null);
+  };
+
+  // Definición de pasos
+  const steps = [
+    { label: "Subir Imagen" },
+    { label: "Ver Resultados" },
+    { label: "Guardar y Descargar" },
+  ];
 
   // ──────────────────────────────────
   // Auth callbacks
@@ -40,6 +64,7 @@ export function Page() {
     setEmail(userEmail);
     localStorage.setItem("token", newToken);
     localStorage.setItem("user_email", userEmail);
+    showToast("¡Sesión iniciada correctamente!", "success");
   };
 
   const handleLogout = () => {
@@ -47,7 +72,16 @@ export function Page() {
     setEmail("");
     localStorage.removeItem("token");
     localStorage.removeItem("user_email");
-    // limpiamos estado de análisis por si acaso
+    
+    // Limpiar estado
+    resetAnalysis();
+    showToast("Sesión cerrada", "info");
+  };
+
+  // ──────────────────────────────────
+  // Reiniciar análisis completo
+  // ──────────────────────────────────
+  const resetAnalysis = () => {
     setFile(null);
     setImageSrc(null);
     setReportText("");
@@ -56,46 +90,44 @@ export function Page() {
     setDetections([]);
     setTeethFdi(null);
     setErr(null);
-    setCanSave(false);
+    setCurrentStep(1);
   };
 
   // ──────────────────────────────────
-  // Carga / limpieza de archivo
+  // Paso 1: Subir imagen
   // ──────────────────────────────────
-  const onUpload = (f) => {
-    setFile(f);
+  const handleUploadNext = async (uploadedFile) => {
+    setFile(uploadedFile);
     setErr(null);
-    setCanSave(false);
-  };
-
-  const onClear = () => {
-    setFile(null);
-    setImageSrc(null);
-    setReportText("");
-    setStats(null);
-    setSummary(null);
-    setDetections([]);
-    setTeethFdi(null);
-    setErr(null);
-    setCanSave(false);
+    
+    // Inmediatamente llamar al análisis
+    setLoading(true);
+    try {
+      await performAnalysis(uploadedFile);
+      setCurrentStep(2);
+      showToast("¡Imagen analizada exitosamente!", "success");
+    } catch (e) {
+      console.error(e);
+      setErr(e.message || "Error procesando la imagen");
+      showToast(e.message || "Error al analizar la imagen", "error");
+    } finally {
+      setLoading(false);
+    }
   };
 
   // ──────────────────────────────────
   // Llamada genérica al backend
   // ──────────────────────────────────
-  const callAnalyzeEndpoint = async ({ save }) => {
-    if (!file) {
-      throw new Error("Primero sube una imagen.");
-    }
-    if (save && !token) {
-      throw new Error("Debes iniciar sesión para guardar en tu historial.");
+  const performAnalysis = async (fileToAnalyze, shouldSave = false) => {
+    if (!fileToAnalyze) {
+      throw new Error("No hay imagen para analizar");
     }
 
     const fd = new FormData();
-    fd.append("file", file);
+    fd.append("file", fileToAnalyze);
     fd.append("confidence", "0.25");
     fd.append("return_image", "true");
-    if (save) fd.append("save", "true");
+    if (shouldSave) fd.append("save", "true");
 
     let url = `${API_BASE}/analyze-public`;
     const headers = {};
@@ -111,63 +143,68 @@ export function Page() {
       const text = await resp.text().catch(() => "");
       throw new Error(text || `Error HTTP ${resp.status}`);
     }
-    return resp.json();
+
+    const data = await resp.json();
+
+    // Actualizar estados
+    setReportText(data.report_text || "");
+    setStats(data.stats || null);
+    setSummary(data.summary || null);
+    setDetections(Array.isArray(data.detections) ? data.detections : []);
+    setTeethFdi(data.teeth_fdi || null);
+    setImageSrc(
+      data.image_base64 ? `data:image/png;base64,${data.image_base64}` : null
+    );
+
+    return data;
   };
 
   // ──────────────────────────────────
-  // Analizar (solo ver resultados)
+  // Paso 2: Ver resultados → siguiente
   // ──────────────────────────────────
-  const onAnalyze = async () => {
+  const handleResultsNext = () => {
+    setCurrentStep(3);
+  };
+
+  const handleResultsBack = () => {
+    setCurrentStep(1);
+    resetAnalysis();
+  };
+
+  // ──────────────────────────────────
+  // Paso 3: Guardar en historial
+  // ──────────────────────────────────
+  const handleSaveToHistory = async () => {
+    if (!token) {
+      showToast("Debes iniciar sesión para guardar en el historial", "warning");
+      return;
+    }
+
     try {
-      setErr(null);
-      setLoading(true);
-      setCanSave(false);
-
-      const data = await callAnalyzeEndpoint({ save: false });
-
-      setReportText(data.report_text || "");
-      setStats(data.stats || null);
-      setSummary(data.summary || null);
-      setDetections(Array.isArray(data.detections) ? data.detections : []);
-      setTeethFdi(data.teeth_fdi || null);
-      setImageSrc(
-        data.image_base64 ? `data:image/png;base64,${data.image_base64}` : null
-      );
-
-      setCanSave(true);
+      setSaving(true);
+      await performAnalysis(file, true);
+      setLastSavedAt(Date.now());
+      showToast("¡Análisis guardado en tu historial exitosamente!", "success");
     } catch (e) {
       console.error(e);
-      setErr(e.message || "Error procesando la imagen");
+      showToast(e.message || "Error al guardar en el historial", "error");
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
+  const handleStartNew = () => {
+    resetAnalysis();
+    showToast("Listo para un nuevo análisis", "info");
+  };
+
   // ──────────────────────────────────
-  // Guardar en historial
+  // Cambiar de pestaña
   // ──────────────────────────────────
-  const onSaveToHistory = async () => {
-    try {
-      setErr(null);
-      setSaving(true);
-
-      const data = await callAnalyzeEndpoint({ save: true });
-
-      setReportText(data.report_text || "");
-      setStats(data.stats || null);
-      setSummary(data.summary || null);
-      setDetections(Array.isArray(data.detections) ? data.detections : []);
-      setTeethFdi(data.teeth_fdi || null);
-      setImageSrc(
-        data.image_base64 ? `data:image/png;base64,${data.image_base64}` : null
-      );
-
-      setLastSavedAt(Date.now()); // refresca <HistoryPanel/>
-    } catch (e) {
-      console.error(e);
-      setErr(e.message || "No se pudo guardar en tu historial");
-    } finally {
-      setSaving(false);
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    if (tab === "analyze") {
+      resetAnalysis();
     }
   };
 
@@ -218,6 +255,16 @@ export function Page() {
   // ──────────────────────────────────
   return (
     <div style={{ minHeight: "100vh", background: "#003366", color: "#fff" }}>
+      {/* Toast notifications */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={closeToast}
+          duration={4000}
+        />
+      )}
+
       {/* barra superior */}
       <header
         style={{
@@ -229,7 +276,7 @@ export function Page() {
           color: "#fff",
         }}
       >
-        <div style={{ fontWeight: "bold" }}>DentalSmart</div>
+        <div style={{ fontWeight: "bold", fontSize: "18px" }}>DentalSmart</div>
         <div style={{ fontSize: 14 }}>
           Sesión iniciada como <b>{email}</b>
           <button
@@ -237,11 +284,21 @@ export function Page() {
             onClick={handleLogout}
             style={{
               marginLeft: 12,
-              padding: "4px 10px",
+              padding: "6px 14px",
               fontSize: 13,
-              borderRadius: 4,
+              borderRadius: 6,
               border: "none",
               cursor: "pointer",
+              background: "#ef4444",
+              color: "#fff",
+              fontWeight: "500",
+              transition: "background 0.2s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.background = "#dc2626";
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.background = "#ef4444";
             }}
           >
             Cerrar sesión
@@ -260,7 +317,7 @@ export function Page() {
         }}
       >
         <button
-          onClick={() => setActiveTab("analyze")}
+          onClick={() => handleTabChange("analyze")}
           style={{
             padding: "14px 24px",
             background: activeTab === "analyze" ? "#003366" : "transparent",
@@ -276,7 +333,7 @@ export function Page() {
           Analizar
         </button>
         <button
-          onClick={() => setActiveTab("history")}
+          onClick={() => handleTabChange("history")}
           style={{
             padding: "14px 24px",
             background: activeTab === "history" ? "#003366" : "transparent",
@@ -292,7 +349,7 @@ export function Page() {
            Historial
         </button>
         <button
-          onClick={() => setActiveTab("models")}
+          onClick={() => handleTabChange("models")}
           style={{
             padding: "14px 24px",
             background: activeTab === "models" ? "#003366" : "transparent",
@@ -309,25 +366,43 @@ export function Page() {
         </button>
       </div>
 
-      {/*  Contenido condicional según pestaña */}
+      {/* Contenido condicional según pestaña */}
       {activeTab === "analyze" && (
-        <DentalDetectionUI
-          onAnalyze={onAnalyze}
-          onClear={onClear}
-          onUpload={onUpload}
-          onSaveToHistory={onSaveToHistory}
-          loading={loading}
-          saving={saving}
-          canSave={canSave}
-          error={err}
-          annotatedImageSrc={imageSrc}
-          reportText={reportText}
-          stats={stats}
-          summary={summary}
-          detections={detections}
-          teethFdi={teethFdi}
-          filename={file?.name}
-        />
+        <>
+          {/* Indicador de pasos */}
+          <StepIndicator currentStep={currentStep} steps={steps} />
+
+          {/* Paso 1: Subir imagen */}
+          {currentStep === 1 && (
+            <StepUpload onNext={handleUploadNext} loading={loading} />
+          )}
+
+          {/* Paso 2: Ver resultados */}
+          {currentStep === 2 && (
+            <StepResults
+              annotatedImageSrc={imageSrc}
+              reportText={reportText}
+              stats={stats}
+              summary={summary}
+              detections={detections}
+              teethFdi={teethFdi}
+              loading={loading}
+              onNext={handleResultsNext}
+              onBack={handleResultsBack}
+            />
+          )}
+
+          {/* Paso 3: Guardar y descargar */}
+          {currentStep === 3 && (
+            <StepActions
+              annotatedImageSrc={imageSrc}
+              onSaveToHistory={handleSaveToHistory}
+              onStartNew={handleStartNew}
+              saving={saving}
+              isLoggedIn={!!token}
+            />
+          )}
+        </>
       )}
 
       {activeTab === "history" && (
@@ -344,3 +419,19 @@ export function Page() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
