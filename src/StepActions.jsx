@@ -1,4 +1,4 @@
-// src/StepActions.jsx
+// src/StepActions.jsx este sera el unico cambio para el front end .w.
 import React, { useState } from "react";
 
 export function StepActions({
